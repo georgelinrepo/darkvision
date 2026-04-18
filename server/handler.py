@@ -5,14 +5,25 @@ POST /normalise-move
 Body: { "transcript": "knight echo five" }
 Returns: { "san": "Ne5" } or { "san": null }
 
-ANTHROPIC_API_KEY is set as a Lambda environment variable (never in the app).
+The Anthropic API key is fetched from SSM Parameter Store at cold start
+(/darkvision/anthropic-key, SecureString). It is never stored in env vars
+or CloudFormation and is not visible in the AWS console.
 """
 import json
 import os
 import urllib.request
 import urllib.error
+import boto3
 
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+SSM_PARAM = os.environ.get("SSM_PARAM_NAME", "/darkvision/anthropic-key")
+
+def _fetch_api_key() -> str:
+    ssm = boto3.client("ssm")
+    resp = ssm.get_parameter(Name=SSM_PARAM, WithDecryption=True)
+    return resp["Parameter"]["Value"]
+
+# Cached at module level — persists across warm invocations
+ANTHROPIC_API_KEY = _fetch_api_key()
 MODEL = "claude-haiku-4-5-20251001"
 SYSTEM = (
     "You parse spoken chess moves into standard algebraic notation. "

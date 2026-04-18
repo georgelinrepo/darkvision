@@ -2,11 +2,14 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: DarkVision — Move Normaliser Proxy
 
-Parameters:
-  AnthropicApiKey:
-    Type: String
-    NoEcho: true
-    Description: Anthropic API key — pass via --parameter-overrides, never committed
+# Before deploying, store the key once:
+#   aws ssm put-parameter \
+#     --name /darkvision/anthropic-key \
+#     --value sk-ant-... \
+#     --type SecureString
+#
+# The key is encrypted at rest, fetched at Lambda cold start,
+# and never visible in CloudFormation or the Lambda console.
 
 Globals:
   Function:
@@ -22,7 +25,15 @@ Resources:
       CodeUri: .
       Environment:
         Variables:
-          ANTHROPIC_API_KEY: !Ref AnthropicApiKey
+          SSM_PARAM_NAME: /darkvision/anthropic-key
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: ssm:GetParameter
+              Resource: !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/darkvision/anthropic-key'
+            - Effect: Allow
+              Action: kms:Decrypt
+              Resource: !Sub 'arn:aws:kms:${AWS::Region}:${AWS::AccountId}:alias/aws/ssm'
       Events:
         NormaliseMove:
           Type: HttpApi
