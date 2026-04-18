@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { fetchPuzzle, Puzzle } from './src/puzzle';
 import { PuzzleEngine } from './src/puzzleEngine';
@@ -192,6 +192,17 @@ export default function App() {
             <Pressable style={styles.btn} onPress={handleRepeat}>
               <Text style={styles.btnText}>Repeat</Text>
             </Pressable>
+            {puzzle && (
+              <Pressable
+                style={styles.btn}
+                onPress={() => Linking.openURL(`https://lichess.org/training/${puzzle.id}`)}
+              >
+                <Text style={styles.btnText}>View Position</Text>
+              </Pressable>
+            )}
+            <Pressable style={[styles.btn, styles.btnSkip]} onPress={loadPuzzle}>
+              <Text style={styles.btnText}>Skip</Text>
+            </Pressable>
             <Pressable style={[styles.btn, styles.btnDanger]} onPress={handleStop}>
               <Text style={styles.btnText}>Stop</Text>
             </Pressable>
@@ -277,6 +288,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 8,
   },
+  btnSkip:   { backgroundColor: '#1a2a3a' },
   btnDanger: { backgroundColor: '#3a1a1a' },
   btnText: {
     color: '#fff',
