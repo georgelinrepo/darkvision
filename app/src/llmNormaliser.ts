@@ -3,13 +3,13 @@
  * The proxy holds the Anthropic API key — no secrets in the app.
  * Returns SAN string or null if UNCLEAR / error / timeout.
  */
-import { NORMALISER_URL } from './config';
+import { API_URL } from './config';
 
 export async function normaliseMoveWithLLM(transcript: string): Promise<string | null> {
-  if (!NORMALISER_URL) return null;
+  if (!API_URL) return null;
 
   try {
-    const res = await fetch(NORMALISER_URL, {
+    const res = await fetch(`${API_URL}/normalise-move`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ transcript }),

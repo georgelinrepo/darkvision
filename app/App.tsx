@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { fetchPuzzle, Puzzle } from './src/puzzle';
@@ -8,6 +8,7 @@ import { updateRating } from './src/rating';
 import { speak, stop as ttsStop } from './src/tts';
 import { useVoiceLoop, VoiceState } from './src/hooks/useVoiceLoop';
 import { QueryCommand } from './src/moveParser';
+import { fetchRating, saveRating } from './src/ratingApi';
 
 type PuzzleStatus = 'idle' | 'loading' | 'playing' | 'complete' | 'failed';
 
@@ -31,6 +32,11 @@ export default function App() {
   const [status, setStatus] = useState<PuzzleStatus>('idle');
   const [puzzle, setPuzzle] = useState<Puzzle | null>(null);
   const [playerRating, setPlayerRating] = useState(1500);
+
+  // Load persisted rating on mount
+  useEffect(() => {
+    fetchRating().then(setPlayerRating);
+  }, []);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
@@ -53,6 +59,7 @@ export default function App() {
       setPlayerRating(prev => {
         const next = updateRating(prev, puzzle.rating, false);
         speak(`Incorrect. Puzzle failed. Rating: ${next}.`);
+        saveRating(next);
         return next;
       });
       setMessage('Puzzle failed.');
@@ -66,6 +73,7 @@ export default function App() {
       setPlayerRating(prev => {
         const next = updateRating(prev, puzzle.rating, true);
         speak(`Puzzle complete. Rating: ${next}.`);
+        saveRating(next);
         return next;
       });
       setMessage('Puzzle complete!');
