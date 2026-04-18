@@ -32,7 +32,12 @@
     },
     "plugins": [
       "@react-native-voice/voice",
-      "expo-dev-client"
+      "expo-dev-client",
+      ["expo-build-properties", {
+        "android": {
+          "enableJetifier": true
+        }
+      }]
     ],
     "extra": {
       "eas": {
