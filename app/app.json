@@ -37,7 +37,8 @@
         "android": {
           "enableJetifier": true
         }
-      }]
+      }],
+      "./plugins/withAndroidSupportExclusions"
     ],
     "extra": {
       "eas": {
