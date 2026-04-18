@@ -9,8 +9,8 @@ export type MoveResult =
 
 export class PuzzleEngine {
   private chess: Chess;
-  private solution: string[]; // UCI, alternating player / opponent
-  private index = 0;          // index of next expected player move
+  private solution: string[]; // UCI: [0]=player, [1]=opponent, [2]=player, ...
+  private index = 0;          // index of next expected player move (always even)
 
   constructor(puzzle: Puzzle) {
     this.chess = new Chess(puzzle.fen);
@@ -21,13 +21,8 @@ export class PuzzleEngine {
     return this.chess.fen();
   }
 
-  /** How many player moves have been played correctly. */
-  get moveCount(): number {
-    return Math.floor(this.index / 2);
-  }
-
   applyMove(san: string): MoveResult {
-    // 1. Attempt the move (chess.js validates legality)
+    // 1. Attempt the move
     let move;
     try {
       move = this.chess.move(san);
@@ -35,7 +30,7 @@ export class PuzzleEngine {
       return { status: 'illegal' };
     }
 
-    // 2. Compare resulting UCI against expected solution move
+    // 2. Compare UCI against expected solution move
     const uci = move.from + move.to + (move.promotion ?? '');
     const expected = this.solution[this.index];
 
@@ -51,7 +46,7 @@ export class PuzzleEngine {
       return { status: 'correct', complete: true };
     }
 
-    // 4. Apply opponent's response
+    // 4. Apply opponent's response (odd index)
     const oppUci = this.solution[this.index];
     const oppMove = this.chess.move({
       from: oppUci.slice(0, 2) as any,
@@ -60,7 +55,7 @@ export class PuzzleEngine {
     });
     this.index++;
 
-    // 5. Puzzle complete after opponent's last move
+    // 5. Complete if no more player moves
     if (this.index >= this.solution.length) {
       return { status: 'correct', complete: true };
     }
