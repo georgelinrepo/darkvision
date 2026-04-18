@@ -6,10 +6,9 @@
 const { withAppBuildGradle } = require('@expo/config-plugins');
 
 const EXCLUSIONS = `
-// Exclude legacy Android support libraries — use AndroidX equivalents only
+// Exclude all legacy Android support libraries — use AndroidX equivalents only
 configurations.all {
-    exclude group: 'com.android.support', module: 'support-compat'
-    exclude group: 'com.android.support', module: 'versionedparcelable'
+    exclude group: 'com.android.support'
 }
 `;
 
