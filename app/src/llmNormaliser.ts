@@ -1,42 +1,25 @@
 /**
- * LLM fallback for move normalisation.
- * Calls Claude Haiku with a 2-second timeout.
+ * LLM fallback for move normalisation via the darkvision proxy Lambda.
+ * The proxy holds the Anthropic API key — no secrets in the app.
  * Returns SAN string or null if UNCLEAR / error / timeout.
  */
-import { ANTHROPIC_API_KEY } from './config';
-
-const API_URL = 'https://api.anthropic.com/v1/messages';
-const MODEL = 'claude-haiku-4-5-20251001';
-const SYSTEM =
-  'You parse spoken chess moves into standard algebraic notation. ' +
-  'Return the SAN string only (e.g. Nf3, Qxe5, e4, O-O, O-O-O, e8=Q). ' +
-  'Return UNCLEAR if genuinely ambiguous. Nothing else. No explanation.';
+import { NORMALISER_URL } from './config';
 
 export async function normaliseMoveWithLLM(transcript: string): Promise<string | null> {
-  if (!ANTHROPIC_API_KEY) return null;
+  if (!NORMALISER_URL) return null;
 
   try {
-    const res = await fetch(API_URL, {
+    const res = await fetch(NORMALISER_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 16,
-        system: SYSTEM,
-        messages: [{ role: 'user', content: transcript }],
-      }),
-      signal: AbortSignal.timeout(2000),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ transcript }),
+      signal: AbortSignal.timeout(3000),
     });
 
     if (!res.ok) return null;
 
     const data = await res.json();
-    const text: string = data.content?.[0]?.text?.trim() ?? '';
-    return text === 'UNCLEAR' || !text ? null : text;
+    return data.san ?? null;
   } catch {
     return null;
   }

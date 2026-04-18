@@ -1,2 +1,4 @@
-// Set EXPO_PUBLIC_ANTHROPIC_API_KEY in your .env file
-export const ANTHROPIC_API_KEY = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY ?? '';
+// URL of the move normaliser proxy Lambda.
+// Set EXPO_PUBLIC_NORMALISER_URL in app/.env after deploying server/template.yaml.
+// This is a URL, not a secret — safe to ship in the app bundle.
+export const NORMALISER_URL = process.env.EXPO_PUBLIC_NORMALISER_URL ?? '';

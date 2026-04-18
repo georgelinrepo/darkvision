@@ -1,0 +1,36 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: DarkVision — Move Normaliser Proxy
+
+Parameters:
+  AnthropicApiKey:
+    Type: String
+    NoEcho: true
+    Description: Anthropic API key — pass via --parameter-overrides, never committed
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 10
+    MemorySize: 128
+
+Resources:
+  NormaliserFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handler.lambda_handler
+      CodeUri: .
+      Environment:
+        Variables:
+          ANTHROPIC_API_KEY: !Ref AnthropicApiKey
+      Events:
+        NormaliseMove:
+          Type: HttpApi
+          Properties:
+            Path: /normalise-move
+            Method: ANY
+
+Outputs:
+  NormaliserUrl:
+    Description: Proxy endpoint — set as EXPO_PUBLIC_NORMALISER_URL in app/.env
+    Value: !Sub 'https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/normalise-move'
