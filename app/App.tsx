@@ -1,16 +1,19 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { fetchPuzzle, Puzzle } from './src/puzzle';
-import { fenToNarration } from './src/narrator';
+import { PuzzleEngine } from './src/puzzleEngine';
+import { fenToNarration, answerQuery } from './src/narrator';
+import { updateRating } from './src/rating';
 import { speak, stop as ttsStop } from './src/tts';
 import { useVoiceLoop, VoiceState } from './src/hooks/useVoiceLoop';
+import { QueryCommand } from './src/moveParser';
 
-type AppState = 'idle' | 'loading' | 'active' | 'error';
+type PuzzleStatus = 'idle' | 'loading' | 'playing' | 'complete' | 'failed';
 
 const MIC_LABEL: Record<VoiceState, string> = {
   idle:        '',
-  scanning:    '○  waiting for DarkVision',
+  scanning:    '○  say DarkVision',
   listening:   '●  listening',
   processing:  '◌  processing',
   confirming:  '●  confirm?',
@@ -25,49 +28,115 @@ const MIC_COLOR: Record<VoiceState, string> = {
 };
 
 export default function App() {
-  const [appState, setAppState] = useState<AppState>('idle');
+  const [status, setStatus] = useState<PuzzleStatus>('idle');
   const [puzzle, setPuzzle] = useState<Puzzle | null>(null);
+  const [playerRating, setPlayerRating] = useState(1500);
   const [error, setError] = useState('');
-  const [lastMove, setLastMove] = useState('');
+  const [message, setMessage] = useState('');
 
+  // Engine lives in a ref — mutable, no re-renders on each move
+  const engineRef = useRef<PuzzleEngine | null>(null);
+
+  // ── Move handler — called by voice loop after player confirms a move ──
   const handleMove = useCallback((san: string) => {
-    // Phase 3 will validate against solution; for now just echo it
-    setLastMove(san);
-    speak(`Move: ${san}`);
+    const engine = engineRef.current;
+    if (!engine || !puzzle) return;
+
+    const result = engine.applyMove(san);
+
+    if (result.status === 'illegal') {
+      speak('Illegal move — try again.');
+      return; // voice loop is already scanning
+    }
+
+    if (result.status === 'incorrect') {
+      setPlayerRating(prev => {
+        const next = updateRating(prev, puzzle.rating, false);
+        speak(`Incorrect. Puzzle failed. Rating: ${next}.`);
+        return next;
+      });
+      setMessage('Puzzle failed.');
+      setStatus('failed');
+      stopScanning();
+      return;
+    }
+
+    // Correct move
+    if (result.complete) {
+      setPlayerRating(prev => {
+        const next = updateRating(prev, puzzle.rating, true);
+        speak(`Puzzle complete. Rating: ${next}.`);
+        return next;
+      });
+      setMessage('Puzzle complete!');
+      setStatus('complete');
+      stopScanning();
+    } else {
+      setMessage(`✓  ${san}  —  ${result.opponentSan}`);
+      speak(`Correct. ${result.opponentSan}.`);
+      // Voice loop already restarted scanning for next move
+    }
+  }, [puzzle]);
+
+  // ── Query handler — position questions mid-puzzle ──
+  const handleQuery = useCallback((cmd: QueryCommand) => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    const fen = engine.getFen();
+    let answer: string;
+    if (cmd.type === 'where_is') {
+      answer = answerQuery(fen, 'where_is', cmd.color, cmd.piece);
+    } else if (cmd.type === 'repeat_pieces') {
+      answer = answerQuery(fen, 'repeat_pieces', cmd.color);
+    } else {
+      answer = answerQuery(fen, 'repeat_position');
+    }
+    speak(answer);
   }, []);
 
   const { voiceState, pendingMove, startScanning, stopScanning } = useVoiceLoop({
     onMove: handleMove,
+    onQuery: handleQuery,
   });
 
-  async function loadAndRead() {
-    setAppState('loading');
+  // ── Load a new puzzle ──
+  async function loadPuzzle() {
+    ttsStop();
+    setStatus('loading');
     setError('');
+    setMessage('');
+    engineRef.current = null;
+
     try {
       const p = await fetchPuzzle();
       setPuzzle(p);
-      setAppState('active');
+      engineRef.current = new PuzzleEngine(p);
+      setStatus('playing');
       const narration = fenToNarration(p.fen);
       speak(narration, { onDone: () => startScanning() });
     } catch (e: any) {
       setError(e.message ?? 'Failed to fetch puzzle');
-      setAppState('error');
+      setStatus('idle');
     }
+  }
+
+  function handleRepeat() {
+    const engine = engineRef.current;
+    if (!engine) return;
+    ttsStop();
+    speak(fenToNarration(engine.getFen()));
   }
 
   function handleStop() {
     ttsStop();
     stopScanning();
-    setAppState('idle');
+    engineRef.current = null;
     setPuzzle(null);
-    setLastMove('');
+    setStatus('idle');
+    setMessage('');
   }
 
-  function handleRepeat() {
-    if (!puzzle) return;
-    ttsStop();
-    speak(fenToNarration(puzzle.fen));
-  }
+  const playing = status === 'playing';
 
   return (
     <View style={styles.container}>
@@ -75,44 +144,50 @@ export default function App() {
 
       <Text style={styles.title}>DARKVISION</Text>
 
-      {puzzle && (
-        <Text style={styles.rating}>Puzzle {puzzle.rating}</Text>
-      )}
+      <View style={styles.ratingRow}>
+        <Text style={styles.ratingLabel}>Rating</Text>
+        <Text style={styles.ratingValue}>{playerRating}</Text>
+        {puzzle && <Text style={styles.puzzleRating}>  puzzle {puzzle.rating}</Text>}
+      </View>
 
-      {/* Mic state indicator */}
-      {appState === 'active' && (
+      {/* Mic state */}
+      {playing && (
         <View style={styles.micWrap}>
-          <Text style={[styles.micDot, { color: MIC_COLOR[voiceState] }]}>
+          <Text style={[styles.micLabel, { color: MIC_COLOR[voiceState] }]}>
             {MIC_LABEL[voiceState]}
           </Text>
-          {pendingMove && (
-            <Text style={styles.pending}>{pendingMove}</Text>
-          )}
+          {pendingMove && <Text style={styles.pending}>{pendingMove}</Text>}
         </View>
       )}
 
-      {lastMove !== '' && (
-        <Text style={styles.lastMove}>Last: {lastMove}</Text>
+      {/* Status message */}
+      {message !== '' && (
+        <Text style={[
+          styles.message,
+          status === 'failed' && styles.messageFail,
+          status === 'complete' && styles.messageWin,
+        ]}>
+          {message}
+        </Text>
       )}
 
-      {appState === 'loading' && (
+      {status === 'loading' && (
         <ActivityIndicator size="large" color="#fff" style={{ marginTop: 32 }} />
       )}
 
-      {appState === 'error' && (
-        <Text style={styles.error}>{error}</Text>
-      )}
+      {error !== '' && <Text style={styles.error}>{error}</Text>}
 
+      {/* Buttons */}
       <View style={styles.btnRow}>
-        {(appState === 'idle' || appState === 'error') && (
-          <Pressable style={styles.btn} onPress={loadAndRead}>
+        {(status === 'idle' || status === 'complete' || status === 'failed') && (
+          <Pressable style={styles.btn} onPress={loadPuzzle}>
             <Text style={styles.btnText}>
-              {appState === 'error' ? 'Retry' : 'Start Puzzle'}
+              {status === 'idle' ? 'Start Puzzle' : 'Next Puzzle'}
             </Text>
           </Pressable>
         )}
 
-        {appState === 'active' && (
+        {playing && (
           <>
             <Pressable style={styles.btn} onPress={handleRepeat}>
               <Text style={styles.btnText}>Repeat</Text>
@@ -140,38 +215,56 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#fff',
     letterSpacing: 4,
-    marginBottom: 4,
+    marginBottom: 16,
   },
-  rating: {
-    fontSize: 13,
-    color: '#666',
+  ratingRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
     marginBottom: 40,
+  },
+  ratingLabel: {
+    fontSize: 13,
+    color: '#555',
+    marginRight: 6,
+  },
+  ratingValue: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  puzzleRating: {
+    fontSize: 13,
+    color: '#444',
   },
   micWrap: {
     alignItems: 'center',
-    marginBottom: 24,
-    minHeight: 60,
+    minHeight: 64,
+    marginBottom: 16,
   },
-  micDot: {
-    fontSize: 16,
+  micLabel: {
+    fontSize: 15,
     fontWeight: '600',
     letterSpacing: 1,
   },
   pending: {
-    marginTop: 8,
-    fontSize: 22,
+    marginTop: 10,
+    fontSize: 26,
     color: '#fff',
     fontWeight: '700',
   },
-  lastMove: {
-    fontSize: 14,
-    color: '#666',
+  message: {
+    fontSize: 16,
+    color: '#888',
     marginBottom: 16,
+    textAlign: 'center',
   },
+  messageFail: { color: '#f66' },
+  messageWin:  { color: '#4d4' },
   error: {
     color: '#f66',
     marginBottom: 16,
     textAlign: 'center',
+    fontSize: 14,
   },
   btnRow: {
     flexDirection: 'row',
@@ -184,9 +277,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 8,
   },
-  btnDanger: {
-    backgroundColor: '#3a1a1a',
-  },
+  btnDanger: { backgroundColor: '#3a1a1a' },
   btnText: {
     color: '#fff',
     fontSize: 15,

@@ -60,6 +60,31 @@ export function fenToNarration(fen: string): string {
   return `${toMove} to move. White: ${whitePieces}. Black: ${blackPieces}.`;
 }
 
+/** Answer an on-demand position query from the current FEN. */
+export function answerQuery(fen: string, type: string, color?: string, piece?: string): string {
+  const chess = new Chess(fen);
+
+  if (type === 'repeat_position') return fenToNarration(fen);
+
+  if (type === 'repeat_pieces' && color) {
+    const c = color === 'white' ? 'w' : 'b';
+    return describePieces(chess, c);
+  }
+
+  if (type === 'where_is' && color && piece) {
+    const c = color === 'white' ? 'w' : 'b';
+    const sym = Object.entries(PIECE_NAMES).find(([, name]) => name === piece.toLowerCase())?.[0] as PieceSymbol | undefined;
+    if (!sym) return `I don't recognise that piece.`;
+    const squares = chess.board().flat()
+      .filter(sq => sq && sq.color === c && sq.type === sym)
+      .map(sq => sq!.square);
+    if (squares.length === 0) return `No ${color} ${piece} on the board.`;
+    return `${color} ${piece} on ${squares.map(squareToSpeech).join(' and ')}.`;
+  }
+
+  return fenToNarration(fen);
+}
+
 // Convert a UCI move string to a terse spoken phrase for confirmation.
 // e.g. "e2e4" → "pawn echo 2 to echo 4"
 export function uciToSpeech(uci: string, fen: string): string {
