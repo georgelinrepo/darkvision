@@ -1,0 +1,64 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: "DarkVision \u2014 API (move normaliser + rating store)"
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 10
+    MemorySize: 128
+Resources:
+  RatingsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName:
+        Fn::Sub: darkvision-ratings-${AWS::AccountId}
+  DarkVisionFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handler.lambda_handler
+      CodeUri: DarkVisionFunction
+      Environment:
+        Variables:
+          SSM_PARAM_NAME: /darkvision/anthropic-key
+          RATINGS_BUCKET:
+            Ref: RatingsBucket
+      Policies:
+      - Statement:
+        - Effect: Allow
+          Action: ssm:GetParameter
+          Resource:
+            Fn::Sub: arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/darkvision/anthropic-key
+        - Effect: Allow
+          Action: kms:Decrypt
+          Resource:
+            Fn::Sub: arn:aws:kms:${AWS::Region}:${AWS::AccountId}:alias/aws/ssm
+      - Statement:
+        - Effect: Allow
+          Action:
+          - s3:GetObject
+          - s3:PutObject
+          Resource:
+            Fn::Sub: ${RatingsBucket.Arn}/ratings/*
+      Events:
+        GetRating:
+          Type: HttpApi
+          Properties:
+            Path: /rating
+            Method: GET
+        PostRating:
+          Type: HttpApi
+          Properties:
+            Path: /rating
+            Method: POST
+        NormaliseMove:
+          Type: HttpApi
+          Properties:
+            Path: /normalise-move
+            Method: ANY
+    Metadata:
+      SamResourceId: DarkVisionFunction
+Outputs:
+  ApiUrl:
+    Description: "Base API URL \u2014 set as EXPO_PUBLIC_API_URL in app/.env"
+    Value:
+      Fn::Sub: https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com

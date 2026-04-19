@@ -2,8 +2,8 @@ import { Chess } from 'chess.js';
 
 export interface Puzzle {
   id: string;
-  fen: string;        // position at puzzle start — player moves first from here
-  solution: string[]; // UCI moves: [0]=player, [1]=opponent, [2]=player, ...
+  fen: string;        // position AFTER opponent's setup move — player thinks from here
+  solution: string[]; // remaining UCI moves the player must speak (both colours, in order)
   rating: number;
 }
 
@@ -20,21 +20,29 @@ export async function fetchPuzzle(): Promise<Puzzle> {
 
   const pgn: string        = data.game.pgn;
   const initialPly: number = data.puzzle.initialPly;
-  const solution: string[] = data.puzzle.solution;
+  const allMoves: string[] = data.puzzle.solution; // [0]=opponent setup, [1..n]=player speaks
   const rating: number     = data.puzzle.rating;
   const id: string         = data.puzzle.id;
 
-  // Replay game to initialPly — that position is where the player starts
+  // Replay game to initialPly
   const chess = new Chess();
-  const moves = pgn.split(/\s+/).filter(Boolean);
-  for (let i = 0; i < initialPly && i < moves.length; i++) {
-    chess.move(moves[i]);
+  const pgnMoves = pgn.split(/\s+/).filter(Boolean);
+  for (let i = 0; i < initialPly && i < pgnMoves.length; i++) {
+    chess.move(pgnMoves[i]);
   }
+
+  // Apply opponent's setup move (solution[0]) — this is what Lichess shows first
+  const setupMove = allMoves[0];
+  chess.move({
+    from: setupMove.slice(0, 2) as any,
+    to:   setupMove.slice(2, 4) as any,
+    promotion: setupMove[4] as any,
+  });
 
   return {
     id,
-    fen: chess.fen(),
-    solution,   // solution[0] is player's first move
+    fen: chess.fen(),          // position player thinks from
+    solution: allMoves.slice(1), // player speaks all of these in order
     rating,
   };
 }

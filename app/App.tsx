@@ -80,8 +80,8 @@ export default function App() {
       setStatus('complete');
       stopScanning();
     } else {
-      setMessage(`✓  ${san}  —  ${result.opponentSan}`);
-      speak(`Correct. ${result.opponentSan}.`);
+      setMessage(`✓  ${san}`);
+      speak('Correct.');
       // Voice loop already restarted scanning for next move
     }
   }, [puzzle]);

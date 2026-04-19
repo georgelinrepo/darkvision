@@ -52,7 +52,8 @@ Lichess API → Puzzle Engine (FEN + solution)
 - Endpoint: `GET https://lichess.org/api/puzzle/next`
 - Key fields: `game.pgn`, `puzzle.initialPly`, `puzzle.solution` (UCI array), `puzzle.rating`
 - FEN derived by replaying `game.pgn` (space-separated SAN) up to `puzzle.initialPly` plies
-- `solution[0]` is the **player's** first move; `solution[1]` is opponent's response; alternating thereafter
+- `solution[0]` is the opponent's setup move — applied automatically before position is read aloud
+- `solution[1..n]` are spoken by the player in order (both colours — calculation mode)
 
 ## Cost Estimate
 - Lichess API: free
