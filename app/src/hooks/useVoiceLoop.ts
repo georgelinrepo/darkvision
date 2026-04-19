@@ -141,5 +141,12 @@ export function useVoiceLoop({ onMove, onQuery }: UseVoiceLoopOptions) {
     };
   }, []);
 
-  return { voiceState, pendingMove, lastHeard, startScanning, stopScanning };
+  /** Manually trigger the listen-for-move flow (same as wake word firing). */
+  const triggerListen = useCallback(() => {
+    if (!activeRef.current || voiceStateRef.current !== 'scanning') return;
+    stopWakeWordScan().catch(() => {});
+    onWakeWord();
+  }, [onWakeWord]);
+
+  return { voiceState, pendingMove, lastHeard, startScanning, stopScanning, triggerListen };
 }

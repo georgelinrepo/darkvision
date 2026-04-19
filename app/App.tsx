@@ -104,7 +104,7 @@ export default function App() {
     speak(answer);
   }, []);
 
-  const { voiceState, pendingMove, lastHeard, startScanning, stopScanning } = useVoiceLoop({
+  const { voiceState, pendingMove, lastHeard, startScanning, stopScanning, triggerListen } = useVoiceLoop({
     onMove: handleMove,
     onQuery: handleQuery,
   });
@@ -170,6 +170,11 @@ export default function App() {
           {pendingMove && <Text style={styles.pending}>{pendingMove}</Text>}
           {!pendingMove && lastHeard !== '' && (
             <Text style={styles.heard}>{lastHeard}</Text>
+          )}
+          {voiceState === 'scanning' && (
+            <Pressable style={styles.tapBtn} onPress={triggerListen}>
+              <Text style={styles.tapBtnText}>TAP TO SPEAK</Text>
+            </Pressable>
           )}
         </View>
       )}
@@ -302,6 +307,19 @@ const styles = StyleSheet.create({
     color: '#555',
     fontStyle: 'italic',
     textAlign: 'center',
+  },
+  tapBtn: {
+    marginTop: 20,
+    backgroundColor: '#4af',
+    paddingHorizontal: 40,
+    paddingVertical: 18,
+    borderRadius: 12,
+  },
+  tapBtnText: {
+    color: '#000',
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 2,
   },
   message: {
     fontSize: 16,
