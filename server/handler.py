@@ -2,6 +2,7 @@
 DarkVision — Lambda API
 
 Routes:
+  POST /speak            { text } → { audio: base64 mp3 }
   POST /normalise-move   { transcript } → { san }
   GET  /rating           ?user=default  → { rating }
   POST /rating           { user, rating } → {}
@@ -9,12 +10,18 @@ Routes:
 The Anthropic API key is fetched from SSM Parameter Store at cold start.
 Ratings are stored in S3 via RatingStore (swap implementation to change backend).
 """
+import base64
 import json
 import os
 import urllib.request
 import urllib.error
 import boto3
 from store import RatingStore, S3RatingStore
+
+# ── Polly TTS ────────────────────────────────────────────────────────────────
+POLLY_VOICE  = os.environ.get("POLLY_VOICE", "Matthew")
+POLLY_ENGINE = os.environ.get("POLLY_ENGINE", "neural")
+_polly = boto3.client("polly", region_name="eu-west-1")  # neural voices not in eu-north-1
 
 # ── Anthropic key from SSM ───────────────────────────────────────────────────
 SSM_PARAM = os.environ.get("SSM_PARAM_NAME", "/darkvision/anthropic-key")
@@ -58,6 +65,27 @@ def lambda_handler(event, context):
 
     if method == "OPTIONS":
         return _resp(200)
+
+    # ── POST /speak ──────────────────────────────────────────────────────────
+    if path == "/speak" and method == "POST":
+        try:
+            body = json.loads(event.get("body") or "{}")
+            text = body.get("text", "").strip()
+        except (json.JSONDecodeError, TypeError):
+            return _resp(400, {"error": "Invalid JSON"})
+        if not text:
+            return _resp(400, {"error": "text required"})
+        try:
+            response = _polly.synthesize_speech(
+                Text=text,
+                OutputFormat="mp3",
+                VoiceId=POLLY_VOICE,
+                Engine=POLLY_ENGINE,
+            )
+            audio_b64 = base64.b64encode(response["AudioStream"].read()).decode("utf-8")
+            return _resp(200, {"audio": audio_b64})
+        except Exception as e:
+            return _resp(502, {"error": str(e)})
 
     # ── GET /rating ──────────────────────────────────────────────────────────
     if path == "/rating" and method == "GET":

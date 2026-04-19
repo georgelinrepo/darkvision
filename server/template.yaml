@@ -31,6 +31,8 @@ Resources:
         Variables:
           SSM_PARAM_NAME: /darkvision/anthropic-key
           RATINGS_BUCKET: !Ref RatingsBucket
+          POLLY_VOICE: Matthew
+          POLLY_ENGINE: neural
       Policies:
         # SSM — read Anthropic key
         - Statement:
@@ -40,6 +42,11 @@ Resources:
             - Effect: Allow
               Action: kms:Decrypt
               Resource: !Sub 'arn:aws:kms:${AWS::Region}:${AWS::AccountId}:alias/aws/ssm'
+        # Polly — neural TTS
+        - Statement:
+            - Effect: Allow
+              Action: polly:SynthesizeSpeech
+              Resource: "*"
         # S3 — read and write ratings
         - Statement:
             - Effect: Allow
@@ -48,6 +55,11 @@ Resources:
                 - s3:PutObject
               Resource: !Sub '${RatingsBucket.Arn}/ratings/*'
       Events:
+        Speak:
+          Type: HttpApi
+          Properties:
+            Path: /speak
+            Method: POST
         GetRating:
           Type: HttpApi
           Properties:
