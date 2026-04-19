@@ -39,6 +39,7 @@ export default function App() {
   }, []);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [moveIndex, setMoveIndex] = useState(0);
 
   // Engine lives in a ref — mutable, no re-renders on each move
   const engineRef = useRef<PuzzleEngine | null>(null);
@@ -49,6 +50,7 @@ export default function App() {
     if (!engine || !puzzle) return;
 
     const result = engine.applyMove(san);
+    setMoveIndex(engine.moveIndex);
 
     if (result.status === 'illegal') {
       speak('Illegal move — try again.');
@@ -119,6 +121,7 @@ export default function App() {
       const p = await fetchPuzzle();
       setPuzzle(p);
       engineRef.current = new PuzzleEngine(p);
+      setMoveIndex(0);
       setStatus('playing');
       const narration = fenToNarration(p.fen);
       speak(narration, { onDone: () => startScanning() });
@@ -184,6 +187,25 @@ export default function App() {
       )}
 
       {error !== '' && <Text style={styles.error}>{error}</Text>}
+
+      {/* DEBUG: expected solution moves */}
+      {puzzle && (
+        <View style={styles.debug}>
+          <Text style={styles.debugTitle}>Expected moves (UCI):</Text>
+          {puzzle.solution.map((uci, i) => (
+            <Text
+              key={i}
+              style={[
+                styles.debugMove,
+                i === moveIndex && styles.debugMoveCurrent,
+                i < moveIndex && styles.debugMoveDone,
+              ]}
+            >
+              {i + 1}. {uci}{i === moveIndex ? '  ←' : ''}
+            </Text>
+          ))}
+        </View>
+      )}
 
       {/* Buttons */}
       <View style={styles.btnRow}>
@@ -302,5 +324,33 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 15,
     fontWeight: '600',
+  },
+  debug: {
+    marginTop: 20,
+    padding: 12,
+    backgroundColor: '#1a1a2e',
+    borderRadius: 8,
+    alignSelf: 'stretch',
+  },
+  debugTitle: {
+    color: '#666',
+    fontSize: 11,
+    marginBottom: 4,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  debugMove: {
+    color: '#555',
+    fontSize: 13,
+    fontFamily: 'monospace',
+    paddingVertical: 1,
+  },
+  debugMoveCurrent: {
+    color: '#4af',
+    fontWeight: '700',
+  },
+  debugMoveDone: {
+    color: '#2a5',
+    textDecorationLine: 'line-through',
   },
 });

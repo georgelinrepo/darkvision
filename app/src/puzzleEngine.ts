@@ -24,6 +24,14 @@ export class PuzzleEngine {
     return this.index;
   }
 
+  get moveIndex(): number {
+    return this.index;
+  }
+
+  get solutionMoves(): string[] {
+    return this.solution;
+  }
+
   applyMove(san: string): MoveResult {
     // 1. Attempt the move (chess.js enforces legality and turn order)
     let move;
