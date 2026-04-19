@@ -8,14 +8,14 @@ import { API_URL } from './config';
 const DEFAULT_USER = 'default';
 
 export async function fetchRating(userId = DEFAULT_USER): Promise<number> {
-  if (!API_URL) return 1500;
+  if (!API_URL) return 1200;
   try {
     const res = await fetch(`${API_URL}/rating?user=${encodeURIComponent(userId)}`);
-    if (!res.ok) return 1500;
+    if (!res.ok) return 1200;
     const data = await res.json();
-    return typeof data.rating === 'number' ? data.rating : 1500;
+    return typeof data.rating === 'number' ? data.rating : 1200;
   } catch {
-    return 1500;
+    return 1200;
   }
 }
 

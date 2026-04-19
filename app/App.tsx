@@ -31,7 +31,7 @@ const MIC_COLOR: Record<VoiceState, string> = {
 export default function App() {
   const [status, setStatus] = useState<PuzzleStatus>('idle');
   const [puzzle, setPuzzle] = useState<Puzzle | null>(null);
-  const [playerRating, setPlayerRating] = useState(1500);
+  const [playerRating, setPlayerRating] = useState(1200);
 
   // Load persisted rating on mount
   useEffect(() => {
