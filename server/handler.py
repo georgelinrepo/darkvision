@@ -76,8 +76,10 @@ def lambda_handler(event, context):
         if not text:
             return _resp(400, {"error": "text required"})
         try:
+            is_ssml = text.strip().startswith('<speak>')
             response = _polly.synthesize_speech(
                 Text=text,
+                TextType="ssml" if is_ssml else "text",
                 OutputFormat="mp3",
                 VoiceId=POLLY_VOICE,
                 Engine=POLLY_ENGINE,

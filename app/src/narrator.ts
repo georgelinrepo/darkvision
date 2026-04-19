@@ -36,23 +36,15 @@ function describePieces(chess: Chess, color: Color): string {
     const count = squares.length;
     const name = PIECE_NAMES[sym];
 
-    if (sym === 'p' && count > 2) {
-      // Group pawns by rank when there are many
-      const byRank: Record<string, string[]> = {};
-      for (const sq of squares) {
-        const rank = sq[1];
-        byRank[rank] = byRank[rank] ?? [];
-        byRank[rank].push(squareToSpeech(sq));
-      }
-      const rankGroups = Object.entries(byRank).map(([rank, files]) =>
-        `${COUNT_WORDS[files.length] ?? files.length} pawn${files.length > 1 ? 's' : ''} on rank ${rank}`,
-      );
-      parts.push(rankGroups.join(', '));
-    } else if (count === 1) {
+    if (count === 1) {
       parts.push(`a ${name} on ${squareToSpeech(squares[0])}`);
     } else {
       const countWord = COUNT_WORDS[count] ?? count.toString();
-      parts.push(`${countWord} ${name}s on ${squares.map(squareToSpeech).join(' and ')}`);
+      const squareList = squares.map(squareToSpeech);
+      const listed = squareList.length === 2
+        ? `${squareList[0]} and ${squareList[1]}`
+        : squareList.slice(0, -1).join(', ') + ', and ' + squareList[squareList.length - 1];
+      parts.push(`${countWord} ${name}s on ${listed}`);
     }
   }
 
@@ -69,7 +61,14 @@ export function fenToNarration(fen: string): string {
   const whitePieces = describePieces(chess, 'w');
   const blackPieces = describePieces(chess, 'b');
 
-  return `${toMove} to move. White has ${whitePieces}. Black has ${blackPieces}.`;
+  // SSML: slow rate + pauses between sections for Polly
+  return (
+    `<speak><prosody rate="85%">` +
+    `${toMove} to move. ` +
+    `<break time="400ms"/>White has ${whitePieces}. ` +
+    `<break time="600ms"/>Black has ${blackPieces}.` +
+    `</prosody></speak>`
+  );
 }
 
 /** Answer an on-demand position query from the current FEN. */
