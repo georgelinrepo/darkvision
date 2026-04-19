@@ -7,8 +7,14 @@ import * as Speech from 'expo-speech';
 import { API_URL } from './config';
 
 let _currentSound: Audio.Sound | null = null;
+let _currentAbort: AbortController | null = null;
 
 async function _stopCurrent() {
+  // Cancel any in-flight Polly fetch so it can't start playing later
+  if (_currentAbort) {
+    _currentAbort.abort();
+    _currentAbort = null;
+  }
   if (_currentSound) {
     try {
       await _currentSound.stopAsync();
@@ -27,18 +33,23 @@ export async function speak(
 
   // ── Polly path ────────────────────────────────────────────────────────────
   if (API_URL) {
+    const abort = new AbortController();
+    _currentAbort = abort;
     try {
       const res = await fetch(`${API_URL}/speak`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
+        signal: abort.signal,
       });
 
+      if (abort.signal.aborted) return;
       if (!res.ok) throw new Error(`Polly proxy ${res.status}`);
 
       const { audio } = await res.json();
+      if (abort.signal.aborted) return;
 
-      // Write base64 MP3 to cache and play
+      _currentAbort = null;
       await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
       const uri = `data:audio/mpeg;base64,${audio}`;
       const { sound } = await Audio.Sound.createAsync({ uri });
@@ -56,7 +67,8 @@ export async function speak(
       await sound.playAsync();
       return;
     } catch {
-      // Fall through to native TTS
+      if (abort.signal.aborted) return; // cancelled — don't fall through
+      // Fall through to native TTS on genuine error
     }
   }
 
