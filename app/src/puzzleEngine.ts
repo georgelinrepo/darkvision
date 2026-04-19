@@ -9,10 +9,12 @@ export type MoveResult =
 export class PuzzleEngine {
   private chess: Chess;
   private solution: string[]; // UCI moves player must speak in order (both colours)
+  private startFen: string;
   private index = 0;
 
   constructor(puzzle: Puzzle) {
     this.chess = new Chess(puzzle.fen);
+    this.startFen = puzzle.fen;
     this.solution = puzzle.solution;
   }
 
@@ -28,8 +30,17 @@ export class PuzzleEngine {
     return this.index;
   }
 
-  get solutionMoves(): string[] {
-    return this.solution;
+  /** Solution moves converted to SAN for display (e.g. "Qxd5", "Nf3"). */
+  get solutionSAN(): string[] {
+    const board = new Chess(this.startFen);
+    return this.solution.map(uci => {
+      try {
+        const m = board.move({ from: uci.slice(0, 2) as any, to: uci.slice(2, 4) as any, promotion: uci[4] as any });
+        return m.san;
+      } catch {
+        return uci; // fallback to raw UCI if conversion fails
+      }
+    });
   }
 
   applyMove(san: string): MoveResult {

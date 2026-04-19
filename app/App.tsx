@@ -189,10 +189,10 @@ export default function App() {
       {error !== '' && <Text style={styles.error}>{error}</Text>}
 
       {/* DEBUG: expected solution moves */}
-      {puzzle && (
+      {puzzle && engineRef.current && (
         <View style={styles.debug}>
-          <Text style={styles.debugTitle}>Expected moves (UCI):</Text>
-          {puzzle.solution.map((uci, i) => (
+          <Text style={styles.debugTitle}>Expected moves:</Text>
+          {engineRef.current.solutionSAN.map((san, i) => (
             <Text
               key={i}
               style={[
@@ -201,7 +201,7 @@ export default function App() {
                 i < moveIndex && styles.debugMoveDone,
               ]}
             >
-              {i + 1}. {uci}{i === moveIndex ? '  ←' : ''}
+              {i + 1}. {san}{i === moveIndex ? '  ←' : ''}
             </Text>
           ))}
         </View>
