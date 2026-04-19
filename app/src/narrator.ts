@@ -12,21 +12,14 @@ const PIECE_NAMES: Record<PieceSymbol, string> = {
 // Order pieces are announced: K Q R B N P
 const PIECE_ORDER: PieceSymbol[] = ['k', 'q', 'r', 'b', 'n', 'p'];
 
-// Map file letter to spoken word to avoid ambiguity (e.g. "b" vs "be")
-const FILE_NAMES: Record<string, string> = {
-  a: 'alpha',
-  b: 'bravo',
-  c: 'charlie',
-  d: 'delta',
-  e: 'echo',
-  f: 'foxtrot',
-  g: 'golf',
-  h: 'hotel',
-};
-
 function squareToSpeech(square: string): string {
-  return `${FILE_NAMES[square[0]]} ${square[1]}`;
+  return square; // e.g. "d1", "e4" — standard chess notation
 }
+
+const COUNT_WORDS: Record<number, string> = {
+  1: 'one', 2: 'two', 3: 'three', 4: 'four',
+  5: 'five', 6: 'six', 7: 'seven', 8: 'eight',
+};
 
 function describePieces(chess: Chess, color: Color): string {
   const parts: string[] = [];
@@ -40,14 +33,33 @@ function describePieces(chess: Chess, color: Color): string {
 
     if (squares.length === 0) continue;
 
-    const name = squares.length === 1
-      ? PIECE_NAMES[sym]
-      : `${PIECE_NAMES[sym]}s`;
+    const count = squares.length;
+    const name = PIECE_NAMES[sym];
 
-    parts.push(`${name} on ${squares.map(squareToSpeech).join(' and ')}`);
+    if (sym === 'p' && count > 2) {
+      // Group pawns by rank when there are many
+      const byRank: Record<string, string[]> = {};
+      for (const sq of squares) {
+        const rank = sq[1];
+        byRank[rank] = byRank[rank] ?? [];
+        byRank[rank].push(squareToSpeech(sq));
+      }
+      const rankGroups = Object.entries(byRank).map(([rank, files]) =>
+        `${COUNT_WORDS[files.length] ?? files.length} pawn${files.length > 1 ? 's' : ''} on rank ${rank}`,
+      );
+      parts.push(rankGroups.join(', '));
+    } else if (count === 1) {
+      parts.push(`a ${name} on ${squareToSpeech(squares[0])}`);
+    } else {
+      const countWord = COUNT_WORDS[count] ?? count.toString();
+      parts.push(`${countWord} ${name}s on ${squares.map(squareToSpeech).join(' and ')}`);
+    }
   }
 
-  return parts.join(', ');
+  // Oxford-comma join so Polly pauses naturally at each piece group
+  if (parts.length === 0) return 'no pieces';
+  if (parts.length === 1) return parts[0];
+  return parts.slice(0, -1).join(', ') + ', and ' + parts[parts.length - 1];
 }
 
 export function fenToNarration(fen: string): string {
@@ -57,7 +69,7 @@ export function fenToNarration(fen: string): string {
   const whitePieces = describePieces(chess, 'w');
   const blackPieces = describePieces(chess, 'b');
 
-  return `${toMove} to move. White: ${whitePieces}. Black: ${blackPieces}.`;
+  return `${toMove} to move. White has ${whitePieces}. Black has ${blackPieces}.`;
 }
 
 /** Answer an on-demand position query from the current FEN. */
@@ -68,7 +80,7 @@ export function answerQuery(fen: string, type: string, color?: string, piece?: s
 
   if (type === 'repeat_pieces' && color) {
     const c = color === 'white' ? 'w' : 'b';
-    return describePieces(chess, c);
+    return `${color} has ${describePieces(chess, c)}.`;
   }
 
   if (type === 'where_is' && color && piece) {
