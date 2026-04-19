@@ -142,9 +142,11 @@ export function useVoiceLoop({ onMove, onQuery }: UseVoiceLoopOptions) {
   }, []);
 
   /** Manually trigger the listen-for-move flow (same as wake word firing). */
-  const triggerListen = useCallback(() => {
+  const triggerListen = useCallback(async () => {
     if (!activeRef.current || voiceStateRef.current !== 'scanning') return;
-    stopWakeWordScan().catch(() => {});
+    await stopWakeWordScan();
+    // Brief gap so Android fully releases the mic before listenOnce grabs it
+    await new Promise(r => setTimeout(r, 300));
     onWakeWord();
   }, [onWakeWord]);
 

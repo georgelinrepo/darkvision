@@ -156,6 +156,7 @@ export function listenOnce(timeoutMs = 5000): Promise<string> {
 
     Voice.destroy()
       .catch(() => {})
+      .then(() => new Promise(r => setTimeout(r, 200)))
       .then(() => Voice.start('en-US'))
       .catch(() => done(''));
   });
