@@ -9,16 +9,29 @@ import Voice, { SpeechResultsEvent, SpeechErrorEvent } from '@react-native-voice
 // ── Wake word scanning ────────────────────────────────────────────────────────
 
 type ScanCallback = () => void;
+type TranscriptCallback = (text: string) => void;
 
 let _scanning = false;
 let _onWakeWord: ScanCallback | null = null;
+let _onTranscript: TranscriptCallback | null = null;
 let _scanTimer: ReturnType<typeof setTimeout> | null = null;
 let _sessionActive = false;
 
 function containsWakeWord(text: string): boolean {
-  const n = text.toLowerCase().replace(/[\s\-_]/g, '');
-  // Accept "darkvision", "dark vision", "darkest vision", common mishearings
-  return n.includes('darkvision') || n.includes('darkvizion') || n.includes('darkbision');
+  const t = text.toLowerCase();
+  const n = t.replace(/[\s\-_']/g, '');
+  // Exact / joined variants
+  if (
+    n.includes('darkvision') ||
+    n.includes('darkvizion') ||
+    n.includes('darkbision') ||
+    n.includes('darkversion') ||
+    n.includes('darkfision') ||
+    n.includes('darkvishon')
+  ) return true;
+  // "dark" followed shortly by "vis" / "viz" / "bis"
+  if (/dark.{0,4}vi[sz]/i.test(t)) return true;
+  return false;
 }
 
 function clearScanTimer() {
@@ -49,27 +62,32 @@ function scheduleScanRestart(delayMs = 600) {
   }
 }
 
-export async function startWakeWordScan(onWakeWord: ScanCallback): Promise<void> {
+export async function startWakeWordScan(
+  onWakeWord: ScanCallback,
+  onTranscript?: TranscriptCallback,
+): Promise<void> {
   _scanning = true;
   _onWakeWord = onWakeWord;
+  _onTranscript = onTranscript ?? null;
   _sessionActive = false;
 
   Voice.onSpeechResults = (e: SpeechResultsEvent) => {
     _sessionActive = false;
     const transcript = (e.value ?? []).join(' ');
+    _onTranscript?.(transcript);
     if (containsWakeWord(transcript)) {
       _scanning = false;
       clearScanTimer();
       Voice.destroy().catch(() => {});
       _onWakeWord?.();
     } else {
-      scheduleScanRestart(500);
+      scheduleScanRestart(400);
     }
   };
 
   Voice.onSpeechPartialResults = (e: SpeechResultsEvent) => {
-    // Check partial results too for faster wake word detection
     const transcript = (e.value ?? []).join(' ');
+    _onTranscript?.(transcript + '…');
     if (containsWakeWord(transcript) && _scanning) {
       _scanning = false;
       _sessionActive = false;
@@ -82,17 +100,15 @@ export async function startWakeWordScan(onWakeWord: ScanCallback): Promise<void>
 
   Voice.onSpeechError = (_e: SpeechErrorEvent) => {
     _sessionActive = false;
-    scheduleScanRestart(1000);
+    scheduleScanRestart(800);
   };
 
   Voice.onSpeechEnd = () => {
-    // Don't restart here — wait for onSpeechResults which follows shortly.
-    // Add a fallback in case results never arrive.
-    _scanTimer = setTimeout(() => {
-      if (_scanning && !_sessionActive) {
-        _doStartScan();
-      }
-    }, 800);
+    // Session ended — clear active flag regardless of whether results arrive.
+    // This prevents the mic going permanently silent if Android fires onSpeechEnd
+    // without a following onSpeechResults or onSpeechError.
+    _sessionActive = false;
+    scheduleScanRestart(400);
   };
 
   await _doStartScan();

@@ -25,6 +25,7 @@ interface UseVoiceLoopOptions {
 export function useVoiceLoop({ onMove, onQuery }: UseVoiceLoopOptions) {
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');
   const [pendingMove, setPendingMove] = useState<string | null>(null);
+  const [lastHeard, setLastHeard] = useState<string>('');
 
   // Use refs so async closures always see latest values
   const voiceStateRef = useRef<VoiceState>('idle');
@@ -122,7 +123,7 @@ export function useVoiceLoop({ onMove, onQuery }: UseVoiceLoopOptions) {
   const startScanning = useCallback(() => {
     activeRef.current = true;
     _setState('scanning');
-    startWakeWordScan(onWakeWord);
+    startWakeWordScan(onWakeWord, (t) => setLastHeard(t));
   }, [onWakeWord]);
 
   const stopScanning = useCallback(async () => {
@@ -140,5 +141,5 @@ export function useVoiceLoop({ onMove, onQuery }: UseVoiceLoopOptions) {
     };
   }, []);
 
-  return { voiceState, pendingMove, startScanning, stopScanning };
+  return { voiceState, pendingMove, lastHeard, startScanning, stopScanning };
 }

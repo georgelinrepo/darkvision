@@ -104,7 +104,7 @@ export default function App() {
     speak(answer);
   }, []);
 
-  const { voiceState, pendingMove, startScanning, stopScanning } = useVoiceLoop({
+  const { voiceState, pendingMove, lastHeard, startScanning, stopScanning } = useVoiceLoop({
     onMove: handleMove,
     onQuery: handleQuery,
   });
@@ -168,6 +168,9 @@ export default function App() {
             {MIC_LABEL[voiceState]}
           </Text>
           {pendingMove && <Text style={styles.pending}>{pendingMove}</Text>}
+          {!pendingMove && lastHeard !== '' && (
+            <Text style={styles.heard}>{lastHeard}</Text>
+          )}
         </View>
       )}
 
@@ -292,6 +295,13 @@ const styles = StyleSheet.create({
     fontSize: 26,
     color: '#fff',
     fontWeight: '700',
+  },
+  heard: {
+    marginTop: 6,
+    fontSize: 12,
+    color: '#555',
+    fontStyle: 'italic',
+    textAlign: 'center',
   },
   message: {
     fontSize: 16,
